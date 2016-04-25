@@ -8,6 +8,41 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/fluffle/goirc/client",
+			"repository": "https://github.com/fluffle/goirc",
+			"revision": "8d77d1625cb9faeed794603c3e32c08946879770",
+			"branch": "master",
+			"path": "/client"
+		},
+		{
+			"importpath": "github.com/fluffle/goirc/logging",
+			"repository": "https://github.com/fluffle/goirc",
+			"revision": "8d77d1625cb9faeed794603c3e32c08946879770",
+			"branch": "master",
+			"path": "/logging"
+		},
+		{
+			"importpath": "github.com/fluffle/goirc/state",
+			"repository": "https://github.com/fluffle/goirc",
+			"revision": "8d77d1625cb9faeed794603c3e32c08946879770",
+			"branch": "master",
+			"path": "/state"
+		},
+		{
+			"importpath": "github.com/golang/mock/gomock",
+			"repository": "https://github.com/golang/mock",
+			"revision": "bd3c8e81be01eef76d4b503f5e687d2d1354d2d9",
+			"branch": "master",
+			"path": "/gomock"
+		},
+		{
+			"importpath": "golang.org/x/net/proxy",
+			"repository": "https://go.googlesource.com/net",
+			"revision": "b797637b7aeeed133049c7281bfa31dcc9ca42d6",
+			"branch": "master",
+			"path": "/proxy"
+		},
+		{
 			"importpath": "gopkg.in/yaml.v2",
 			"repository": "https://gopkg.in/yaml.v2",
 			"revision": "a83829b6f1293c91addabc89d0571c246397bbf4",
