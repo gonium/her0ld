@@ -1,9 +1,9 @@
 package main
 
 import (
-	//"crypto/tls"
+	"crypto/tls"
 	"github.com/codegangsta/cli"
-	irc "github.com/fluffle/goirc/client"
+	irc "github.com/thoj/go-ircevent"
 	"log"
 	"os"
 	"time"
@@ -22,57 +22,37 @@ func main() {
 		},
 	}
 	app.Action = func(c *cli.Context) {
-		if c.Bool("verbose") {
-			log.Printf("Started %s", app.Name)
-		}
+		channel := "#her0ld-dev"
+		nick := "her0ld-dev"
+		server := "irc.hackint.org:9999"
+		quitmsg := "There's been a little complication with my complication. -- Mr. Terrain, Brazil"
 
-		cfg := irc.NewConfig("her0ld-dev")
-		cfg.SSL = false
-		//cfg.SSLConfig = &tls.Config{ServerName: "irc.hackint.org"}
-		//cfg.Server = "irc.hackint.org:9999"
-		cfg.Server = "irc.hackint.org:6667"
-		cfg.NewNick = func(n string) string { return n + "^" }
-		ircconn := irc.Client(cfg)
-		ircconn.EnableStateTracking()
-
-		// Add handlers to do things here!
-		// e.g. join a channel on connect.
-		ircconn.HandleFunc(irc.CONNECTED,
-			func(conn *irc.Conn, line *irc.Line) {
-				log.Printf("Attempting to join channel")
-				conn.Join("#her0ld-dev")
-			})
-		// And a signal on disconnect
+		// TODO: proper event handling
 		quit := make(chan bool)
-		ircconn.HandleFunc(irc.DISCONNECTED,
-			func(conn *irc.Conn, line *irc.Line) {
-				log.Printf("Received DISCONNECTED: \n- %#v  \n-%#v", conn, line)
-				quit <- true
-			})
 
-		// Tell client to connect.
+		ircconn := irc.IRC(nick, "Development of her0ld bot")
 		if c.Bool("verbose") {
-			log.Printf("Attempting to connect to %s", cfg.Server)
+			log.Printf("Started %s with verbose logging", app.Name)
+			ircconn.Debug = true
+			//ircconn.VerboseCallbackHandler = true
 		}
-		if err := ircconn.Connect(); err != nil {
-			log.Fatal("Connection error: %s\n", err.Error())
-		}
+		ircconn.UseTLS = true
+		ircconn.TLSConfig = &tls.Config{InsecureSkipVerify: true}
+		ircconn.PingFreq = 1 * time.Minute
+		ircconn.QuitMessage = quitmsg
 
-		// TODO: Print all lines received from server.
-		go func() {
-			for fromserver := range ircconn.in {
-				log.Println(fromserver)
-			}
-		}()
+		// Join channel upon welcome message
+		ircconn.AddCallback("001", func(e *irc.Event) {
+			ircconn.Join(channel)
+		})
+		// When end of nick list of channel received: send hello message
+		// to channel
+		ircconn.AddCallback("366", func(e *irc.Event) {
+			ircconn.Privmsg(channel, "bot is active")
+		})
+		ircconn.Connect(server)
 
-		log.Println("Client: %#v", ircconn)
-		for i := 0; i < 10; i++ {
-			time.Sleep(1 * time.Second)
-			ircconn.Privmsg("#her0ld-dev", "foobar!")
-			ircconn.Notice("#her0ld-dev", "notice!")
-		}
-
-		// Wait for disconnect
+		//// Wait for disconnect
 		<-quit
 
 	}

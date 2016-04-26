@@ -8,13 +8,6 @@
 			"branch": "master"
 		},
 		{
-			"importpath": "github.com/fluffle/goirc/client",
-			"repository": "https://github.com/fluffle/goirc",
-			"revision": "8d77d1625cb9faeed794603c3e32c08946879770",
-			"branch": "master",
-			"path": "/client"
-		},
-		{
 			"importpath": "github.com/fluffle/goirc/logging",
 			"repository": "https://github.com/fluffle/goirc",
 			"revision": "8d77d1625cb9faeed794603c3e32c08946879770",
@@ -34,6 +27,12 @@
 			"revision": "bd3c8e81be01eef76d4b503f5e687d2d1354d2d9",
 			"branch": "master",
 			"path": "/gomock"
+		},
+		{
+			"importpath": "github.com/thoj/go-ircevent",
+			"repository": "https://github.com/thoj/go-ircevent",
+			"revision": "da78ed515c0f0833e7a92c7cc52898176198e2c1",
+			"branch": "master"
 		},
 		{
 			"importpath": "golang.org/x/net/proxy",
