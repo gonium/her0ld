@@ -6,6 +6,7 @@ import (
 	irc "github.com/thoj/go-ircevent"
 	"log"
 	"os"
+	"os/signal"
 	"time"
 )
 
@@ -25,10 +26,24 @@ func main() {
 		channel := "#her0ld-dev"
 		nick := "her0ld-dev"
 		server := "irc.hackint.org:9999"
-		quitmsg := "There's been a little complication with my complication. -- Mr. Terrain, Brazil"
+		quitmsg := `There's been a little complication with my complication.
+										-- Mrs. Terrain, Brazil`
 
-		// TODO: proper event handling
+		// whenever the bot should be terminated, send a 'true' to this
+		// channel.
 		quit := make(chan bool)
+
+		// intercept CTRL-C and jump to proper bot termination
+		ctrlc := make(chan os.Signal, 1)
+		signal.Notify(ctrlc, os.Interrupt)
+		go func() {
+			for _ = range ctrlc {
+				if c.Bool("verbose") {
+					log.Printf("Received SIGINT")
+				}
+				quit <- true
+			}
+		}()
 
 		ircconn := irc.IRC(nick, "Development of her0ld bot")
 		if c.Bool("verbose") {
@@ -52,9 +67,12 @@ func main() {
 		})
 		ircconn.Connect(server)
 
-		//// Wait for disconnect
+		// wait for termination signal
 		<-quit
-
+		// cleanup tasks
+		log.Printf("Terminating bot.")
+		ircconn.Quit()
+		time.Sleep(1 * time.Second)
 	}
 	app.Run(os.Args)
 }
