@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 )
 
@@ -65,7 +66,29 @@ func main() {
 		ircconn.AddCallback("366", func(e *irc.Event) {
 			ircconn.Privmsg(channel, "bot is active")
 		})
-		ircconn.Connect(server)
+
+		// forward PRIVMSG to bots
+		ircconn.AddCallback("PRIVMSG", func(event *irc.Event) {
+			//event.Message() contains the message
+			//event.Nick Contains the sender
+			//event.Arguments[0] Contains the channel
+			source := event.Arguments[0]
+			if strings.HasPrefix(source, "#") {
+				// channel message
+				log.Printf("Received PRIVMSG in channel %s from %s: %s",
+					source, event.Nick, event.Message())
+			} else {
+				// query message
+				log.Printf("Received QUERY from %s: %s",
+					source, event.Nick, event.Message())
+			}
+		})
+
+		// now, run the server
+		err := ircconn.Connect(server)
+		if err != nil {
+			log.Fatalf("Failed to connect to %s: %s", server, err.Error())
+		}
 
 		// wait for termination signal
 		<-quit
