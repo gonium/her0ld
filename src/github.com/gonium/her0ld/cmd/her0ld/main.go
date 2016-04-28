@@ -3,11 +3,11 @@ package main
 import (
 	"crypto/tls"
 	"github.com/codegangsta/cli"
+	"github.com/gonium/her0ld/bots"
 	irc "github.com/thoj/go-ircevent"
 	"log"
 	"os"
 	"os/signal"
-	"strings"
 	"time"
 )
 
@@ -57,6 +57,11 @@ func main() {
 		ircconn.PingFreq = 1 * time.Minute
 		ircconn.QuitMessage = quitmsg
 
+		var allBots []her0ld.Bot
+		// the echobot is only helpful during development...
+		allBots = append(allBots, her0ld.NewEchoBot("Echobot"))
+		allBots = append(allBots, her0ld.NewPingBot("Pingbot"))
+
 		// Join channel upon welcome message
 		ircconn.AddCallback("001", func(e *irc.Event) {
 			ircconn.Join(channel)
@@ -72,15 +77,46 @@ func main() {
 			//event.Message() contains the message
 			//event.Nick Contains the sender
 			//event.Arguments[0] Contains the channel
+			for idx, arg := range event.Arguments {
+				log.Println("%d - %s", idx, arg)
+			}
 			source := event.Arguments[0]
-			if strings.HasPrefix(source, "#") {
+			msg := her0ld.InboundMessage{
+				Channel: source,
+				Nick:    event.Nick,
+				Message: event.Message(),
+			}
+			if msg.IsChannelEvent() {
 				// channel message
-				log.Printf("Received PRIVMSG in channel %s from %s: %s",
-					source, event.Nick, event.Message())
+				log.Printf("Inbound channel message: %s", msg)
+				for _, bot := range allBots {
+					answerlines, err := bot.ProcessChannelEvent(msg)
+					if err != nil {
+						log.Printf("Bot %s failed to process inbound channel message \"%s\": %s",
+							bot.GetName(), event.Message(), err.Error())
+					} else {
+						for _, line := range answerlines {
+							ircconn.Privmsg(line.Destination, line.Message)
+						}
+					}
+				}
 			} else {
 				// query message
-				log.Printf("Received QUERY from %s: %s",
-					source, event.Nick, event.Message())
+				// TODO: This is broken. event.Nick does not contain the sender,
+				// but the bot itself.
+				log.Printf("Inbound query message: %s", msg)
+				for _, bot := range allBots {
+					answerlines, err := bot.ProcessQueryEvent(msg)
+					if err != nil {
+						log.Printf("Bot %s failed to process inbound query message \"%s\": %s",
+							bot.GetName(), event.Message(), err.Error())
+					} else {
+						for _, line := range answerlines {
+							ircconn.Privmsg(line.Destination, line.Message)
+						}
+					}
+				}
+
 			}
 		})
 
