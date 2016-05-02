@@ -22,7 +22,12 @@ func main() {
 			Name:  "verbose, v",
 			Usage: "print verbose messages",
 		},
+		cli.StringFlag{
+			Name:  "config, c",
+			Usage: "Load configuration from `FILE`",
+		},
 	}
+	// TODO: Create a command for generating an example configuration
 	app.Action = func(c *cli.Context) {
 		channel := "#her0ld-dev"
 		nick := "her0ld-dev"
