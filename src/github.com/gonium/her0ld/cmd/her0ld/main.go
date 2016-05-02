@@ -24,10 +24,25 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:  "config, c",
-			Usage: "Load configuration from `FILE`",
+			Usage: "Load configuration from given file",
 		},
 	}
 	// TODO: Create a command for generating an example configuration
+	app.Commands = []cli.Command{
+		{
+			Name:  "genconfig",
+			Usage: "Generates a sample configuration file",
+			Action: func(c *cli.Context) {
+				cfgfile := c.String("config")
+				if cfgfile == "" {
+					log.Fatalf("Please provide a configuration file (-c)")
+				}
+				if c.Bool("verbose") {
+					log.Println("Writing sample configuration to %s", cfgfile)
+				}
+			},
+		},
+	}
 	app.Action = func(c *cli.Context) {
 		channel := "#her0ld-dev"
 		nick := "her0ld-dev"
