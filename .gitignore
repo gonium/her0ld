@@ -1,6 +1,8 @@
 # gb specific directory layout
 /bin
 /pkg
+# Default configuration file
+her0ld.cfg
 # Compiled Object files, Static and Dynamic libs (Shared Objects)
 *.o
 *.a

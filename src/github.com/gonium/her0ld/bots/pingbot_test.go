@@ -1,4 +1,4 @@
-package her0ld
+package her0ldbot
 
 import (
 	"testing"
