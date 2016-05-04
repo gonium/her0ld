@@ -62,12 +62,17 @@ func main() {
 					log.Printf("Started %s with verbose logging", app.Name)
 					log.Printf("Using configuration found in %s", cfgfile)
 				}
+				cfg, err := her0ld.LoadConfig(cfgfile)
+				if err != nil {
+					log.Fatalf("Failed to load config: %s", err.Error())
+				}
 
-				channel := "#her0ld-dev"
-				nick := "her0ld-dev"
-				server := "irc.hackint.org:9999"
-				quitmsg := `There's been a little complication with my complication.
-										-- Mrs. Terrain, Brazil`
+				// TODO: Deal with several channel/nick configurations
+				channel := cfg.Bots[0].Channel
+				nick := cfg.Bots[0].Nick
+				fullname := cfg.Bots[0].Fullname
+				server := cfg.Bots[0].Server
+				quitmsg := cfg.Bots[0].Quitmsg
 
 				// whenever the bot should be terminated, send a 'true' to this
 				// channel.
@@ -85,7 +90,7 @@ func main() {
 					}
 				}()
 
-				ircconn := irc.IRC(nick, "Development of her0ld bot")
+				ircconn := irc.IRC(nick, fullname)
 				if c.Bool("verbose") {
 					ircconn.Debug = true
 					//ircconn.VerboseCallbackHandler = true
@@ -96,9 +101,13 @@ func main() {
 				ircconn.QuitMessage = quitmsg
 
 				var allBots []her0ldbot.Bot
-				// the echobot is only helpful during development...
-				allBots = append(allBots, her0ldbot.NewEchoBot("Echobot"))
-				allBots = append(allBots, her0ldbot.NewPingBot("Pingbot"))
+				if cfg.Functions.Echobot_enable {
+					// the echobot is only helpful during development...
+					allBots = append(allBots, her0ldbot.NewEchoBot("Echobot"))
+				}
+				if cfg.Functions.Pingbot_enable {
+					allBots = append(allBots, her0ldbot.NewPingBot("Pingbot"))
+				}
 
 				// Join channel upon welcome message
 				ircconn.AddCallback("001", func(e *irc.Event) {
@@ -159,7 +168,7 @@ func main() {
 				})
 
 				// now, run the server
-				err := ircconn.Connect(server)
+				err = ircconn.Connect(server)
 				if err != nil {
 					log.Fatalf("Failed to connect to %s: %s", server, err.Error())
 				}
