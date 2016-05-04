@@ -73,6 +73,8 @@ func main() {
 				fullname := cfg.Bots[0].Fullname
 				server := cfg.Bots[0].Server
 				quitmsg := cfg.Bots[0].Quitmsg
+				enable_tls := cfg.Bots[0].EnableTLS
+				strictcertcheck := cfg.Bots[0].StrictCertCheck
 
 				// whenever the bot should be terminated, send a 'true' to this
 				// channel.
@@ -95,8 +97,10 @@ func main() {
 					ircconn.Debug = true
 					//ircconn.VerboseCallbackHandler = true
 				}
-				ircconn.UseTLS = true
-				ircconn.TLSConfig = &tls.Config{InsecureSkipVerify: true}
+				ircconn.UseTLS = enable_tls
+				ircconn.TLSConfig = &tls.Config{
+					InsecureSkipVerify: !strictcertcheck,
+				}
 				ircconn.PingFreq = 1 * time.Minute
 				ircconn.QuitMessage = quitmsg
 

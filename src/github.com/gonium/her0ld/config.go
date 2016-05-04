@@ -6,12 +6,14 @@ import (
 )
 
 type BotConnection struct {
-	Enabled  bool
-	Channel  string
-	Server   string
-	Nick     string
-	Fullname string
-	Quitmsg  string
+	Enabled         bool
+	Channel         string
+	Server          string
+	Nick            string
+	Fullname        string
+	Quitmsg         string
+	EnableTLS       bool
+	StrictCertCheck bool
 }
 
 type BotEnable struct {
