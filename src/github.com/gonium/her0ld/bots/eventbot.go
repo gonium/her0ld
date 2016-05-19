@@ -14,8 +14,7 @@ const (
 	* add <date> <description> - add an event
 	* list - list all events (with id)
 	* del <id> - remove the event with the given id
-	* today - show all events today
-	`
+	* today - show all events today`
 )
 
 /* The EventBot maintains a list of events and attempts to
