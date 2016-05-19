@@ -17,8 +17,9 @@ type BotConnection struct {
 }
 
 type BotEnable struct {
-	Echobot_enable bool
-	Pingbot_enable bool
+	Echobot_enable  bool
+	Pingbot_enable  bool
+	Eventbot_enable bool
 }
 
 type Config struct {
@@ -47,8 +48,9 @@ func MkExampleConfig() Config {
 			},
 		},
 		Functions: BotEnable{
-			Echobot_enable: false,
-			Pingbot_enable: false,
+			Echobot_enable:  false,
+			Pingbot_enable:  true,
+			Eventbot_enable: true,
 		},
 	}
 }

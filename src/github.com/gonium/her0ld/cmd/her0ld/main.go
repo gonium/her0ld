@@ -112,6 +112,9 @@ func main() {
 				if cfg.Functions.Pingbot_enable {
 					allBots = append(allBots, her0ldbot.NewPingBot("Pingbot"))
 				}
+				if cfg.Functions.Eventbot_enable {
+					allBots = append(allBots, her0ldbot.NewEventBot("Eventbot"))
+				}
 
 				// Join channel upon welcome message
 				ircconn.AddCallback("001", func(e *irc.Event) {
