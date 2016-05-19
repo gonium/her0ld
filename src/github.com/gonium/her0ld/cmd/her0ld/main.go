@@ -18,7 +18,6 @@ func main() {
 	app.Usage = "A friendly IRC bot written in Go."
 	app.Version = "0.1.0"
 	app.HideVersion = true
-	// TODO: Create a command for generating an example configuration
 	app.Commands = []cli.Command{
 		{
 			Name:  "genconfig",

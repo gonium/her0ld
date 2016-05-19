@@ -15,6 +15,8 @@ const (
 	* list - list all events (with id)
 	* del <id> - remove the event with the given id
 	* today - show all events today`
+	EVENTBOT_CMD_ADD         = "add"
+	EVENTBOT_CMD_ADD_SUCCESS = "Recorded new event."
 )
 
 /* The EventBot maintains a list of events and attempts to
@@ -41,12 +43,26 @@ func (b *EventBot) strings2reply(dest string, lines []string) []OutboundMessage 
 
 func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, error) {
 	b.NumMessagesHandled += 1
-	// !event help command
+	// look for commands
 	if strings.HasPrefix(msg.Message, fmt.Sprintf("%s %s",
 		EVENTBOT_PREFIX, EVENTBOT_CMD_HELP)) {
+		// help command
 		answer := strings.Split(EVENTBOT_HELP_TEXT, "\n")
 		return b.strings2reply(msg.Channel, answer), nil
-	} else if strings.HasPrefix(msg.Message, EVENTBOT_PREFIX) { // invalid command (!event foo)
+	} else if strings.HasPrefix(msg.Message, fmt.Sprintf("%s %s",
+		EVENTBOT_PREFIX, EVENTBOT_CMD_ADD)) {
+		// add new event command
+		request := strings.Split(msg.Message, " ")
+		// request[0|1] contain the add command - we need date and
+		// description.
+		datestr := request[2]
+		description := strings.Join(request[3:], " ")
+		// TODO: Implement proper handling
+		fmt.Printf("Date %s, desc %s", datestr, description)
+		answer := []string{EVENTBOT_CMD_ADD_SUCCESS}
+		return b.strings2reply(msg.Channel, answer), nil
+	} else if strings.HasPrefix(msg.Message, EVENTBOT_PREFIX) {
+		// invalid command (!event foo)
 		answer := []string{EVENTBOT_INVALID_COMMAND}
 		return b.strings2reply(msg.Channel, answer), nil
 	} else { // something else
