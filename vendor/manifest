@@ -14,6 +14,12 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/denisenkom/go-mssqldb",
+			"repository": "https://github.com/denisenkom/go-mssqldb",
+			"revision": "2a223b1644106bc7ca456c12cde55a80185813ef",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/fluffle/goirc/logging",
 			"repository": "https://github.com/fluffle/goirc",
 			"revision": "8d77d1625cb9faeed794603c3e32c08946879770",
@@ -28,6 +34,12 @@
 			"path": "/state"
 		},
 		{
+			"importpath": "github.com/go-sql-driver/mysql",
+			"repository": "https://github.com/go-sql-driver/mysql",
+			"revision": "3654d25ec346ee8ce71a68431025458d52a38ac0",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/golang/mock/gomock",
 			"repository": "https://github.com/golang/mock",
 			"revision": "bd3c8e81be01eef76d4b503f5e687d2d1354d2d9",
@@ -35,10 +47,41 @@
 			"path": "/gomock"
 		},
 		{
+			"importpath": "github.com/jinzhu/gorm",
+			"repository": "https://github.com/jinzhu/gorm",
+			"revision": "bf0e23607840019d62e32e87e9af48e881d74b1e",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/jinzhu/inflection",
+			"repository": "https://github.com/jinzhu/inflection",
+			"revision": "3272df6c21d04180007eb3349844c89a3856bc25",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/lib/pq",
+			"repository": "https://github.com/lib/pq",
+			"revision": "ee1442bda7bd1b6a84e913bdb421cb1874ec629d",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/mattn/go-sqlite3",
+			"repository": "https://github.com/mattn/go-sqlite3",
+			"revision": "38ee283dabf11c9cbdb968eebd79b1fa7acbabe6",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/thoj/go-ircevent",
 			"repository": "https://github.com/thoj/go-ircevent",
 			"revision": "da78ed515c0f0833e7a92c7cc52898176198e2c1",
 			"branch": "master"
+		},
+		{
+			"importpath": "golang.org/x/crypto/md4",
+			"repository": "https://go.googlesource.com/crypto",
+			"revision": "89d9e62992539701a49a19c52ebb33e84cbbe80f",
+			"branch": "master",
+			"path": "/md4"
 		},
 		{
 			"importpath": "golang.org/x/net/proxy",

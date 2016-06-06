@@ -2,13 +2,20 @@ package her0ldbot
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 )
 
+func MkEventBot() EventBot {
+	file, _ := ioutil.TempFile(os.TempDir(), "her0ld-eventbot-test")
+	return NewEventBot("EventBot", file, "Europe/Berlin")
+}
+
 // Ignore ordinary chat messages
 func TestNoCommand(t *testing.T) {
-	bot := NewEventBot("EventBot")
+	bot := MkEventBot()
 	msg := InboundMessage{
 		Channel: "Channel",
 		Nick:    "Nick",
@@ -28,7 +35,7 @@ func TestNoCommand(t *testing.T) {
 
 // Ignore an invalid command (i.e. for another bot)
 func TestInvalidCommand(t *testing.T) {
-	bot := NewEventBot("EventBot")
+	bot := MkEventBot()
 	msg := InboundMessage{
 		Channel: "Channel",
 		Nick:    "Nick",
@@ -47,7 +54,7 @@ func TestInvalidCommand(t *testing.T) {
 }
 
 func TestEmptyCommand(t *testing.T) {
-	bot := NewEventBot("EventBot")
+	bot := MkEventBot()
 	msg := InboundMessage{
 		Channel: "Channel",
 		Nick:    "Nick",
@@ -75,7 +82,7 @@ func TestEmptyCommand(t *testing.T) {
 }
 
 func TestHelpCommand(t *testing.T) {
-	bot := NewEventBot("EventBot")
+	bot := MkEventBot()
 	line := fmt.Sprintf("%s %s", EVENTBOT_PREFIX, EVENTBOT_CMD_HELP)
 	msg := InboundMessage{
 		Channel: "Channel",

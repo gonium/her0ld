@@ -112,7 +112,9 @@ func main() {
 					allBots = append(allBots, her0ldbot.NewPingBot("Pingbot"))
 				}
 				if cfg.Functions.Eventbot_enable {
-					allBots = append(allBots, her0ldbot.NewEventBot("Eventbot"))
+					// TODO: Move settings to the configuration file
+					allBots = append(allBots, her0ldbot.NewEventBot("Eventbot",
+						"/tmp/her0ld-events.db", "Europe/Berlin"))
 				}
 
 				// Join channel upon welcome message
