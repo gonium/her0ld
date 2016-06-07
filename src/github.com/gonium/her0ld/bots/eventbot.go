@@ -18,12 +18,18 @@ const (
 	EVENTBOT_HELP_TEXT           = `!event usage:
 	* help - this text
 	* add <date> <description> - add an event
-	* list - list all events (with id)
+	* list - list all upcoming events (with id)
 	* del <id> - remove the event with the given id
 	* today - show all events today`
-	EVENTBOT_CMD_ADD         = "add"
-	EVENTBOT_CMD_ADD_SUCCESS = "Recorded new event."
-	EVENTBOT_CMD_LIST        = "list"
+	EVENTBOT_CMD_ADD                  = "add"
+	EVENTBOT_CMD_ADD_SUCCESS          = "Recorded new event."
+	EVENTBOT_CMD_LIST                 = "list"
+	EVENTBOT_CMD_LIST_NONE_AVAILABLE  = "no upcoming events."
+	EVENTBOT_CMD_TODAY                = "today"
+	EVENTBOT_CMD_TODAY_NONE_AVAILABLE = "no events today."
+	EVENTBOT_CMD_DELETE               = "del"
+	EVENTBOT_CMD_EVENT_UNKNOWN        = "Unknown event."
+	EVENTBOT_CMD_DELETED_EVENT        = "Event %d deleted."
 )
 
 /********************************** Event *************************************/
@@ -112,11 +118,46 @@ func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, e
 		}
 	} else if strings.HasPrefix(msg.Message, fmt.Sprintf("%s %s",
 		EVENTBOT_PREFIX, EVENTBOT_CMD_LIST)) {
-		var events []Event
-		b.Db.Find(&events)
 		var answer []string
-		for _, event := range events {
-			answer = append(answer, event.String())
+		var events []Event
+		b.Db.Where("starttime > ?", time.Now()).Find(&events)
+		if len(events) == 0 {
+			answer = append(answer, EVENTBOT_CMD_LIST_NONE_AVAILABLE)
+		} else {
+			for _, event := range events {
+				answer = append(answer, event.String())
+			}
+		}
+		return b.strings2reply(msg.Channel, answer), nil
+	} else if strings.HasPrefix(msg.Message, fmt.Sprintf("%s %s",
+		EVENTBOT_PREFIX, EVENTBOT_CMD_TODAY)) {
+		var answer []string
+		var events []Event
+		starttime := time.Now().Truncate(24 * time.Hour)
+		endtime := time.Now().Add(24 * time.Hour).Truncate(24 * time.Hour)
+		b.Db.Where("starttime > ? and starttime < ?", starttime, endtime).Find(&events)
+		if len(events) == 0 {
+			answer = append(answer, EVENTBOT_CMD_TODAY_NONE_AVAILABLE)
+		} else {
+			for _, event := range events {
+				answer = append(answer, event.String())
+			}
+		}
+		return b.strings2reply(msg.Channel, answer), nil
+	} else if strings.HasPrefix(msg.Message, fmt.Sprintf("%s %s",
+		EVENTBOT_PREFIX, EVENTBOT_CMD_DELETE)) {
+		request := strings.Split(msg.Message, " ")
+		var answer []string
+		var events []Event
+		b.Db.Where("ID == ?", request[2]).Find(&events)
+		if len(events) == 0 {
+			answer = append(answer, EVENTBOT_CMD_EVENT_UNKNOWN)
+		} else {
+			for _, event := range events {
+				b.Db.Delete(&event)
+				answer = append(answer, fmt.Sprintf(EVENTBOT_CMD_DELETED_EVENT,
+					event.Id))
+			}
 		}
 		return b.strings2reply(msg.Channel, answer), nil
 	} else if strings.HasPrefix(msg.Message, EVENTBOT_PREFIX) {
