@@ -16,6 +16,22 @@ type BotConnection struct {
 	StrictCertCheck bool
 }
 
+type EmailSettings struct {
+	Enabled      bool
+	SMTPUsername string
+	SMTPPassword string
+	SMTPServer   string
+	SMTPPort     int
+	FromAddress  string
+	ToAddress    string
+}
+
+type EventbotConfig struct {
+	Timezone      string
+	DBFile        string
+	EmailSettings EmailSettings
+}
+
 type BotEnable struct {
 	Echobot_enable  bool
 	Pingbot_enable  bool
@@ -23,8 +39,9 @@ type BotEnable struct {
 }
 
 type Config struct {
-	Bots      []BotConnection
-	Functions BotEnable
+	Bots        []BotConnection
+	Functions   BotEnable
+	EventbotCfg EventbotConfig
 }
 
 func MkExampleConfig() Config {
@@ -51,6 +68,10 @@ func MkExampleConfig() Config {
 			Echobot_enable:  false,
 			Pingbot_enable:  true,
 			Eventbot_enable: true,
+		},
+		EventbotCfg: EventbotConfig{
+			Timezone: "Europe/Berlin",
+			DBFile:   "/tmp/her0ld-events.db",
 		},
 	}
 }

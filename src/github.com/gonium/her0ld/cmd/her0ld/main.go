@@ -114,7 +114,7 @@ func main() {
 				if cfg.Functions.Eventbot_enable {
 					// TODO: Move settings to the configuration file
 					allBots = append(allBots, her0ldbot.NewEventBot("Eventbot",
-						"/tmp/her0ld-events.db", "Europe/Berlin"))
+						cfg.EventbotCfg))
 				}
 
 				// Join channel upon welcome message
@@ -124,7 +124,7 @@ func main() {
 				// When end of nick list of channel received: send hello message
 				// to channel
 				ircconn.AddCallback("366", func(e *irc.Event) {
-					ircconn.Privmsg(channel, "bot is active")
+					//ircconn.Privmsg(channel, "bot is active")
 				})
 
 				// forward PRIVMSG to bots
@@ -151,7 +151,13 @@ func main() {
 									bot.GetName(), event.Message(), err.Error())
 							} else {
 								for _, line := range answerlines {
-									ircconn.Privmsg(line.Destination, line.Message)
+									currentnick := ircconn.GetNick()
+									if line.Destination != currentnick {
+										ircconn.Privmsg(line.Destination, line.Message)
+									} else {
+										log.Printf("Line destination is %s, would send to myself (%s). Dropping line.", line.Destination, currentnick)
+									}
+
 								}
 							}
 						}
@@ -167,7 +173,12 @@ func main() {
 									bot.GetName(), event.Message(), err.Error())
 							} else {
 								for _, line := range answerlines {
-									ircconn.Privmsg(line.Destination, line.Message)
+									currentnick := ircconn.GetNick()
+									if line.Destination != currentnick {
+										ircconn.Privmsg(line.Destination, line.Message)
+									} else {
+										log.Printf("Line destination is %s, would send to myself (%s). Dropping line.", line.Destination, currentnick)
+									}
 								}
 							}
 						}

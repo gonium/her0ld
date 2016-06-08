@@ -2,9 +2,12 @@ package her0ldbot
 
 import (
 	"fmt"
+	"github.com/gonium/her0ld"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"log"
+	"net/smtp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -18,18 +21,20 @@ const (
 	EVENTBOT_HELP_TEXT           = `!event usage:
 	* help - this text
 	* add <date> <description> - add an event
-	* list - list all upcoming events (with id)
+	* upcoming - list all upcoming events (with id)
 	* del <id> - remove the event with the given id
 	* today - show all events today`
 	EVENTBOT_CMD_ADD                  = "add"
 	EVENTBOT_CMD_ADD_SUCCESS          = "Recorded new event."
-	EVENTBOT_CMD_LIST                 = "list"
+	EVENTBOT_CMD_LIST                 = "upcoming"
 	EVENTBOT_CMD_LIST_NONE_AVAILABLE  = "no upcoming events."
 	EVENTBOT_CMD_TODAY                = "today"
 	EVENTBOT_CMD_TODAY_NONE_AVAILABLE = "no events today."
 	EVENTBOT_CMD_DELETE               = "del"
 	EVENTBOT_CMD_EVENT_UNKNOWN        = "Unknown event."
 	EVENTBOT_CMD_DELETED_EVENT        = "Event %d deleted."
+	EVENTBOT_CMD_MAILTEST             = "mailtest"
+	EVENTBOT_MAILTEST_REPLY           = "Attempted to send test mail."
 )
 
 /********************************** Event *************************************/
@@ -45,6 +50,36 @@ func (e *Event) String() string {
 		e.Description)
 }
 
+/********************************** MailSender ***********************************/
+type MailSender struct {
+	FromAddress string
+	ToAddress   string
+	SMTPAuth    smtp.Auth
+	SMTPServer  string
+	SMTPPort    int
+}
+
+func NewMailSender(from, to, username, password, server string, port int) *MailSender {
+	return &MailSender{
+		FromAddress: from,
+		ToAddress:   to,
+		SMTPAuth:    smtp.PlainAuth("", username, password, server),
+		SMTPServer:  server,
+		SMTPPort:    port,
+	}
+}
+
+func (ms *MailSender) SendMail(msg string) {
+	err := smtp.SendMail(ms.SMTPServer+":"+strconv.Itoa(ms.SMTPPort),
+		ms.SMTPAuth,
+		ms.FromAddress,
+		[]string{ms.ToAddress},
+		[]byte(msg))
+	if err != nil {
+		log.Print("ERROR: attempting to send a mail ", err)
+	}
+}
+
 /********************************** EventBot *************************************/
 /* The EventBot maintains a list of events and attempts to
  * remind people. */
@@ -53,24 +88,40 @@ type EventBot struct {
 	TimeLocation       *time.Location
 	NumMessagesHandled int
 	Db                 *gorm.DB
+	MailSender         *MailSender
 }
 
-func NewEventBot(name string, dbfile string, timelocation string) *EventBot {
-	db, err := gorm.Open("sqlite3", dbfile)
+func NewEventBot(name string, cfg her0ld.EventbotConfig) *EventBot {
+	if cfg.DBFile == "" {
+		log.Fatalf("Eventbot: No database file given - aborting")
+	}
+	db, err := gorm.Open("sqlite3", cfg.DBFile)
 	// no sense in continuing w/o database
 	if err != nil {
-		log.Fatalf("Cannot open database - %s", err.Error())
+		log.Fatalf("Eventbot: Cannot open database - %s", err.Error())
 	}
 	db.AutoMigrate(&Event{})
-	loc, err := time.LoadLocation(timelocation)
-	if err != nil {
-		log.Fatalf("Cannot load location - %s", err.Error())
+	if cfg.Timezone == "" {
+		log.Fatalf("Eventbot: No timezone configured - aborting.")
 	}
+	loc, err := time.LoadLocation(cfg.Timezone)
+	if err != nil {
+		log.Fatalf("Eventbot: Cannot load location based on timezone - %s", err.Error())
+	}
+	ms := NewMailSender(
+		cfg.EmailSettings.FromAddress,
+		cfg.EmailSettings.ToAddress,
+		cfg.EmailSettings.SMTPUsername,
+		cfg.EmailSettings.SMTPPassword,
+		cfg.EmailSettings.SMTPServer,
+		cfg.EmailSettings.SMTPPort,
+	)
 	return &EventBot{
 		BotName:            name,
 		TimeLocation:       loc,
 		NumMessagesHandled: 0,
 		Db:                 db,
+		MailSender:         ms,
 	}
 }
 
@@ -160,6 +211,15 @@ func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, e
 			}
 		}
 		return b.strings2reply(msg.Channel, answer), nil
+	} else if strings.HasPrefix(msg.Message, fmt.Sprintf("%s %s",
+		EVENTBOT_PREFIX, EVENTBOT_CMD_MAILTEST)) {
+		mailtext := "To: md@gonium.net\r\n" +
+			"Subject: Plain test Mail\r\n" +
+			"\r\n" +
+			"Testing mail.\r\n"
+		b.MailSender.SendMail(mailtext)
+		answer := []string{EVENTBOT_MAILTEST_REPLY}
+		return b.strings2reply(msg.Channel, answer), nil
 	} else if strings.HasPrefix(msg.Message, EVENTBOT_PREFIX) {
 		// invalid command (!event foo)
 		answer := []string{EVENTBOT_INVALID_COMMAND}
@@ -179,3 +239,9 @@ func (b *EventBot) ProcessQueryEvent(msg InboundMessage) ([]OutboundMessage, err
 func (b *EventBot) GetName() string {
 	return b.BotName
 }
+
+// TODO:
+// - Generate Email templates and process them.
+// (https://gist.github.com/nathanleclaire/8662755)
+// - Send reminder emails based on cron
+// (https://godoc.org/github.com/robfig/cron).

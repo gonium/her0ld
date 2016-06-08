@@ -2,6 +2,7 @@ package her0ldbot
 
 import (
 	"fmt"
+	"github.com/gonium/her0ld"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +14,10 @@ func MkEventBot() *EventBot {
 	file := filepath.Join(os.TempDir(), "her0ld-eventbot-test.db")
 	// delete test db if the file exists
 	_ = os.Remove(file)
-	return NewEventBot("EventBot", file, "Europe/Berlin")
+	return NewEventBot("EventBot", her0ld.EventbotConfig{
+		DBFile:   file,
+		Timezone: "Europe/Berlin",
+	})
 }
 
 // Ignore ordinary chat messages
