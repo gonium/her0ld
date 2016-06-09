@@ -1,6 +1,7 @@
 package her0ldbot
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/gonium/her0ld"
 	"github.com/jinzhu/gorm"
@@ -9,6 +10,7 @@ import (
 	"net/smtp"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 )
 
@@ -69,7 +71,7 @@ func NewMailSender(from, to, username, password, server string, port int) *MailS
 	}
 }
 
-func (ms *MailSender) SendMail(msg string) {
+func (ms *MailSender) SendPlainTextMail(msg string) {
 	err := smtp.SendMail(ms.SMTPServer+":"+strconv.Itoa(ms.SMTPPort),
 		ms.SMTPAuth,
 		ms.FromAddress,
@@ -78,6 +80,49 @@ func (ms *MailSender) SendMail(msg string) {
 	if err != nil {
 		log.Print("ERROR: attempting to send a mail ", err)
 	}
+}
+
+func (ms *MailSender) SendEventList(events []Event) {
+	type SmtpTemplateData struct {
+		From         string
+		To           string
+		Subject      string
+		PrimaryEvent string
+		OtherEvents  string
+	}
+	const emailTemplate = `From: {{.From}}
+To: {{.To}}
+Subject: {{.Subject}}
+
+Hallo,
+
+kurze Erinnerung: Heute findet
+
+{{.PrimaryEvent}}
+
+statt. Weitere geplante Events:
+
+{{.OtherEvents}}
+
+Lieben Gruß,
+{{.From}}
+`
+	var doc bytes.Buffer
+	var err error
+	// TODO: Load Template from configuration file
+	context := &SmtpTemplateData{ms.FromAddress,
+		ms.ToAddress,
+		"Heutige Events beim Chaos inKL.",
+		"Primärevent",
+		"Andere Events"}
+	t := template.New("emailTemplate")
+	if t, err = t.Parse(emailTemplate); err != nil {
+		log.Print("error trying to parse mail template ", err)
+	}
+	if err = t.Execute(&doc, context); err != nil {
+		log.Print("error trying to execute mail template ", err)
+	}
+	ms.SendPlainTextMail(doc.String())
 }
 
 /********************************** EventBot *************************************/
@@ -217,7 +262,7 @@ func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, e
 			"Subject: Plain test Mail\r\n" +
 			"\r\n" +
 			"Testing mail.\r\n"
-		b.MailSender.SendMail(mailtext)
+		b.MailSender.SendPlainTextMail(mailtext)
 		answer := []string{EVENTBOT_MAILTEST_REPLY}
 		return b.strings2reply(msg.Channel, answer), nil
 	} else if strings.HasPrefix(msg.Message, EVENTBOT_PREFIX) {
