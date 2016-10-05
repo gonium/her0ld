@@ -48,7 +48,7 @@ type Event struct {
 
 func (e *Event) String() string {
 	return fmt.Sprintf("%d - %s: %s", e.Id,
-		e.Starttime.Format("Mon 2 Jan 15:04:05 2006"),
+		e.Starttime.Format("Mon 2 Jan 2006, 15:04:05"),
 		e.Description)
 }
 
