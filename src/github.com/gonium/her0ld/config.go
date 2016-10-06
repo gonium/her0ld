@@ -16,14 +16,19 @@ type BotConnection struct {
 	StrictCertCheck bool
 }
 
+type GeneralConfig struct {
+	OwnerNick        string
+	OwnerEmailAdress string
+}
+
 type EmailSettings struct {
-	Enabled      bool
-	SMTPUsername string
-	SMTPPassword string
-	SMTPServer   string
-	SMTPPort     int
-	FromAddress  string
-	ToAddress    string
+	Enabled         bool
+	SMTPUsername    string
+	SMTPPassword    string
+	SMTPServer      string
+	SMTPPort        int
+	FromAddress     string
+	RecipientAdress string
 }
 
 type EventbotConfig struct {
@@ -40,12 +45,17 @@ type BotEnable struct {
 
 type Config struct {
 	Bots        []BotConnection
+	General     GeneralConfig
 	Functions   BotEnable
 	EventbotCfg EventbotConfig
 }
 
 func MkExampleConfig() Config {
 	return Config{
+		General: GeneralConfig{
+			OwnerNick:        "myowner",
+			OwnerEmailAdress: "owner@example.com",
+		},
 		Bots: []BotConnection{
 			{
 				Enabled:  true,

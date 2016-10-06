@@ -114,7 +114,7 @@ func main() {
 				if cfg.Functions.Eventbot_enable {
 					// TODO: Move settings to the configuration file
 					allBots = append(allBots, her0ldbot.NewEventBot("Eventbot",
-						cfg.EventbotCfg))
+						cfg.EventbotCfg, cfg.General))
 				}
 
 				// Join channel upon welcome message

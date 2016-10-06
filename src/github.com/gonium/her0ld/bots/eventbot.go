@@ -37,6 +37,7 @@ const (
 	EVENTBOT_CMD_DELETED_EVENT        = "Event %d deleted."
 	EVENTBOT_CMD_MAILTEST             = "mailtest"
 	EVENTBOT_MAILTEST_REPLY           = "Attempted to send test mail."
+	EVENTBOT_MAILTEST_NOTAUTHORIZED   = "Only my owner can do this."
 )
 
 /********************************** Event *************************************/
@@ -55,34 +56,34 @@ func (e *Event) String() string {
 /********************************** MailSender ***********************************/
 type MailSender struct {
 	FromAddress string
-	ToAddress   string
 	SMTPAuth    smtp.Auth
 	SMTPServer  string
 	SMTPPort    int
 }
 
-func NewMailSender(from, to, username, password, server string, port int) *MailSender {
+func NewMailSender(from, username, password, server string, port int) *MailSender {
 	return &MailSender{
 		FromAddress: from,
-		ToAddress:   to,
 		SMTPAuth:    smtp.PlainAuth("", username, password, server),
 		SMTPServer:  server,
 		SMTPPort:    port,
 	}
 }
 
-func (ms *MailSender) SendPlainTextMail(msg string) {
-	err := smtp.SendMail(ms.SMTPServer+":"+strconv.Itoa(ms.SMTPPort),
+func (ms *MailSender) SendPlainTextMail(msg string, toadress string) {
+	serveradress := ms.SMTPServer + ":" + strconv.Itoa(ms.SMTPPort)
+	err := smtp.SendMail(serveradress,
 		ms.SMTPAuth,
 		ms.FromAddress,
-		[]string{ms.ToAddress},
+		[]string{toadress},
 		[]byte(msg))
 	if err != nil {
-		log.Print("ERROR: attempting to send a mail ", err)
+		log.Println("ERROR: failed to send email, ", err.Error())
+		log.Printf("Server %s, configuration was: %+v\n", serveradress, ms.SMTPAuth)
 	}
 }
 
-func (ms *MailSender) SendEventList(events []Event) {
+func (ms *MailSender) SendEventList(events []Event, toadress string) {
 	type SmtpTemplateData struct {
 		From         string
 		To           string
@@ -111,7 +112,7 @@ Lieben Gruß,
 	var err error
 	// TODO: Load Template from configuration file
 	context := &SmtpTemplateData{ms.FromAddress,
-		ms.ToAddress,
+		toadress,
 		"Heutige Events beim Chaos inKL.",
 		"Primärevent",
 		"Andere Events"}
@@ -122,7 +123,7 @@ Lieben Gruß,
 	if err = t.Execute(&doc, context); err != nil {
 		log.Print("error trying to execute mail template ", err)
 	}
-	ms.SendPlainTextMail(doc.String())
+	ms.SendPlainTextMail(doc.String(), toadress)
 }
 
 /********************************** EventBot *************************************/
@@ -134,9 +135,12 @@ type EventBot struct {
 	NumMessagesHandled int
 	Db                 *gorm.DB
 	MailSender         *MailSender
+	OwnerNick          string
+	OwnerEmailAdress   string
+	RecipientAdress    string
 }
 
-func NewEventBot(name string, cfg her0ld.EventbotConfig) *EventBot {
+func NewEventBot(name string, cfg her0ld.EventbotConfig, generalcfg her0ld.GeneralConfig) *EventBot {
 	if cfg.DBFile == "" {
 		log.Fatalf("Eventbot: No database file given - aborting")
 	}
@@ -155,7 +159,6 @@ func NewEventBot(name string, cfg her0ld.EventbotConfig) *EventBot {
 	}
 	ms := NewMailSender(
 		cfg.EmailSettings.FromAddress,
-		cfg.EmailSettings.ToAddress,
 		cfg.EmailSettings.SMTPUsername,
 		cfg.EmailSettings.SMTPPassword,
 		cfg.EmailSettings.SMTPServer,
@@ -167,7 +170,14 @@ func NewEventBot(name string, cfg her0ld.EventbotConfig) *EventBot {
 		NumMessagesHandled: 0,
 		Db:                 db,
 		MailSender:         ms,
+		OwnerNick:          generalcfg.OwnerNick,
+		OwnerEmailAdress:   generalcfg.OwnerEmailAdress,
+		RecipientAdress:    cfg.EmailSettings.RecipientAdress,
 	}
+}
+
+func (b *EventBot) isFromOwner(msg InboundMessage) bool {
+	return msg.Nick == b.OwnerNick
 }
 
 func (b *EventBot) strings2reply(dest string, lines []string) []OutboundMessage {
@@ -258,12 +268,17 @@ func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, e
 		return b.strings2reply(msg.Channel, answer), nil
 	} else if strings.HasPrefix(msg.Message, fmt.Sprintf("%s %s",
 		EVENTBOT_PREFIX, EVENTBOT_CMD_MAILTEST)) {
-		mailtext := "To: md@gonium.net\r\n" +
-			"Subject: Plain test Mail\r\n" +
-			"\r\n" +
-			"Testing mail.\r\n"
-		b.MailSender.SendPlainTextMail(mailtext)
-		answer := []string{EVENTBOT_MAILTEST_REPLY}
+		answer := []string{EVENTBOT_MAILTEST_NOTAUTHORIZED}
+		if b.isFromOwner(msg) {
+			mailtext := "To: " + b.OwnerEmailAdress + "\r\n" +
+				"From: " + b.MailSender.FromAddress + "\r\n" +
+				"Date: " + (time.Now().Format(time.RFC822)) + "\r\n" +
+				"Subject: her0ld mail test\r\n" +
+				"\r\n" +
+				"Testing mail. If you can read this everything should be working.\r\n"
+			go b.MailSender.SendPlainTextMail(mailtext, b.OwnerEmailAdress)
+			answer = []string{EVENTBOT_MAILTEST_REPLY}
+		}
 		return b.strings2reply(msg.Channel, answer), nil
 	} else if strings.HasPrefix(msg.Message, EVENTBOT_PREFIX) {
 		// invalid command (!event foo)
