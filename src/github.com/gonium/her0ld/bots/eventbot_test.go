@@ -10,14 +10,23 @@ import (
 	"time"
 )
 
+var genConfig her0ld.GeneralConfig = her0ld.GeneralConfig{
+	OwnerNick:        "testnick",
+	OwnerEmailAdress: "testowner@example.com",
+}
+
 func MkEventBot() *EventBot {
 	file := filepath.Join(os.TempDir(), "her0ld-eventbot-test.db")
 	// delete test db if the file exists
 	_ = os.Remove(file)
-	return NewEventBot("EventBot", her0ld.EventbotConfig{
-		DBFile:   file,
-		Timezone: "Europe/Berlin",
-	})
+	return NewEventBot(
+		"EventBot",
+		her0ld.EventbotConfig{
+			DBFile:   file,
+			Timezone: "Europe/Berlin",
+		},
+		genConfig,
+	)
 }
 
 // Ignore ordinary chat messages
@@ -106,6 +115,74 @@ func TestHelpCommand(t *testing.T) {
 		if len(response) != expected_len {
 			t.Fatalf("Invalid length of response %#v - expected %d, got %d",
 				response, expected_len, len(response))
+		} else {
+			for idx, expected_line := range expected {
+				if response[idx].Destination != msg.Channel {
+					t.Fatalf("Invalid destination: Expected >%s<, got >%s<", msg.Channel,
+						response[idx].Destination)
+				}
+				if response[idx].Message != expected_line {
+					t.Fatalf("Invalid response: Expected >%s<, got >%s<",
+						expected_line, response[idx].Message)
+				}
+			}
+		}
+	}
+}
+
+// Test mail requested by owner of the bot
+func TestValidOwnerMail(t *testing.T) {
+	bot := MkEventBot()
+	line := fmt.Sprintf("%s %s", EVENTBOT_PREFIX, EVENTBOT_CMD_MAILTEST)
+	msg := InboundMessage{
+		Channel: "Channel",
+		Nick:    genConfig.OwnerNick,
+		Message: line,
+	}
+	response, err := bot.ProcessChannelEvent(msg)
+	if err != nil {
+		t.Fatalf("mailtest command triggered unexpected error: %s",
+			err.Error())
+	} else {
+		expected := strings.Split(EVENTBOT_MAILTEST_REPLY, "\n")
+		expected_len := len(expected)
+		if len(response) != expected_len {
+			t.Fatalf("Invalid response length - expected %d, got %d", expected_len,
+				len(response))
+		} else {
+			for idx, expected_line := range expected {
+				if response[idx].Destination != msg.Channel {
+					t.Fatalf("Invalid destination: Expected >%s<, got >%s<", msg.Channel,
+						response[idx].Destination)
+				}
+				if response[idx].Message != expected_line {
+					t.Fatalf("Invalid response: Expected >%s<, got >%s<",
+						expected_line, response[idx].Message)
+				}
+			}
+		}
+	}
+}
+
+// Test mail requested by not-an-owner of the bot
+func TestInvalidOwnerMail(t *testing.T) {
+	bot := MkEventBot()
+	line := fmt.Sprintf("%s %s", EVENTBOT_PREFIX, EVENTBOT_CMD_MAILTEST)
+	msg := InboundMessage{
+		Channel: "Channel",
+		Nick:    genConfig.OwnerNick + "fooo",
+		Message: line,
+	}
+	response, err := bot.ProcessChannelEvent(msg)
+	if err != nil {
+		t.Fatalf("mailtest command triggered unexpected error: %s",
+			err.Error())
+	} else {
+		expected := strings.Split(EVENTBOT_MAILTEST_NOTAUTHORIZED, "\n")
+		expected_len := len(expected)
+		if len(response) != expected_len {
+			t.Fatalf("Invalid response length - expected %d, got %d", expected_len,
+				len(response))
 		} else {
 			for idx, expected_line := range expected {
 				if response[idx].Destination != msg.Channel {

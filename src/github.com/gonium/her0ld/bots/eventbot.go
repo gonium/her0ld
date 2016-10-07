@@ -26,18 +26,22 @@ const (
 	* upcoming - list all upcoming events (with id)
 	* del <id> - remove the event with the given id
 	* today - show all events today`
-	EVENTBOT_CMD_ADD                  = "add"
-	EVENTBOT_CMD_ADD_SUCCESS          = "Recorded new event."
-	EVENTBOT_CMD_LIST                 = "upcoming"
-	EVENTBOT_CMD_LIST_NONE_AVAILABLE  = "no upcoming events."
-	EVENTBOT_CMD_TODAY                = "today"
-	EVENTBOT_CMD_TODAY_NONE_AVAILABLE = "no events today."
-	EVENTBOT_CMD_DELETE               = "del"
-	EVENTBOT_CMD_EVENT_UNKNOWN        = "Unknown event."
-	EVENTBOT_CMD_DELETED_EVENT        = "Event %d deleted."
-	EVENTBOT_CMD_MAILTEST             = "mailtest"
-	EVENTBOT_MAILTEST_REPLY           = "Attempted to send test mail."
-	EVENTBOT_MAILTEST_NOTAUTHORIZED   = "Only my owner can do this."
+	EVENTBOT_CMD_ADD                     = "add"
+	EVENTBOT_CMD_ADD_SUCCESS             = "Recorded new event."
+	EVENTBOT_CMD_LIST                    = "upcoming"
+	EVENTBOT_CMD_LIST_NONE_AVAILABLE     = "no upcoming events."
+	EVENTBOT_CMD_TODAY                   = "today"
+	EVENTBOT_CMD_TODAY_NONE_AVAILABLE    = "no events today."
+	EVENTBOT_CMD_DELETE                  = "del"
+	EVENTBOT_CMD_EVENT_UNKNOWN           = "Unknown event."
+	EVENTBOT_CMD_DELETED_EVENT           = "Event %d deleted."
+	EVENTBOT_CMD_MAILTEST                = "mailtest"
+	EVENTBOT_MAILTEST_REPLY              = "Attempted to send test mail."
+	EVENTBOT_MAILTEST_NOTAUTHORIZED      = "Only my owner can do this."
+	EVENTBOT_CMD_MAILREMINDER            = "mailreminder"
+	EVENTBOT_MAILREMINDER_REPLY          = "Attempted to send a reminder mail."
+	EVENTBOT_MAILREMINDER_NOTAUTHORIZED  = "Only my owner can do this."
+	EVENTBOT_MAILREMINDER_NONE_AVAILABLE = "No upcoming events found, not sending."
 )
 
 /********************************** Event *************************************/
@@ -79,7 +83,6 @@ func (ms *MailSender) SendPlainTextMail(msg string, toadress string) {
 		[]byte(msg))
 	if err != nil {
 		log.Println("ERROR: failed to send email, ", err.Error())
-		log.Printf("Server %s, configuration was: %+v\n", serveradress, ms.SMTPAuth)
 	}
 }
 
@@ -87,6 +90,7 @@ func (ms *MailSender) SendEventList(events []Event, toadress string) {
 	type SmtpTemplateData struct {
 		From         string
 		To           string
+		Now          string
 		Subject      string
 		PrimaryEvent string
 		OtherEvents  string
@@ -94,6 +98,8 @@ func (ms *MailSender) SendEventList(events []Event, toadress string) {
 	const emailTemplate = `From: {{.From}}
 To: {{.To}}
 Subject: {{.Subject}}
+Date: {{.Now}}
+Content-Type: text/plain; charset=UTF-8
 
 Hallo,
 
@@ -113,7 +119,8 @@ Lieben Gruß,
 	// TODO: Load Template from configuration file
 	context := &SmtpTemplateData{ms.FromAddress,
 		toadress,
-		"Heutige Events beim Chaos inKL.",
+		time.Now().Format(time.RFC822),
+		"Events beim Chaos inKL.",
 		"Primärevent",
 		"Andere Events"}
 	t := template.New("emailTemplate")
@@ -194,6 +201,7 @@ func (b *EventBot) strings2reply(dest string, lines []string) []OutboundMessage 
 func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, error) {
 	b.NumMessagesHandled += 1
 	// look for commands
+	//log.Printf("Processing message %s", msg.Message)
 	if strings.HasPrefix(msg.Message, fmt.Sprintf("%s %s",
 		EVENTBOT_PREFIX, EVENTBOT_CMD_HELP)) {
 		// help command
@@ -278,6 +286,20 @@ func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, e
 				"Testing mail. If you can read this everything should be working.\r\n"
 			go b.MailSender.SendPlainTextMail(mailtext, b.OwnerEmailAdress)
 			answer = []string{EVENTBOT_MAILTEST_REPLY}
+		}
+		return b.strings2reply(msg.Channel, answer), nil
+	} else if strings.HasPrefix(msg.Message, fmt.Sprintf("%s %s",
+		EVENTBOT_PREFIX, EVENTBOT_CMD_MAILREMINDER)) {
+		answer := []string{EVENTBOT_MAILREMINDER_NOTAUTHORIZED}
+		if b.isFromOwner(msg) {
+			var events []Event
+			b.Db.Where("starttime > ?", time.Now()).Find(&events)
+			if len(events) == 0 {
+				answer = []string{EVENTBOT_MAILREMINDER_NONE_AVAILABLE}
+			} else {
+				go b.MailSender.SendEventList(events, "md@gonium.net")
+				answer = []string{EVENTBOT_MAILREMINDER_REPLY}
+			}
 		}
 		return b.strings2reply(msg.Channel, answer), nil
 	} else if strings.HasPrefix(msg.Message, EVENTBOT_PREFIX) {
