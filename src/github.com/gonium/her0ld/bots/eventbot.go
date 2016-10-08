@@ -23,12 +23,12 @@ const (
 	EVENTBOT_HELP_TEXT           = `!event usage:
 	* help - this text
 	* add <date> <description> - add an event
-	* upcoming - list all upcoming events (with id)
+	* list - list all upcoming events (with id)
 	* del <id> - remove the event with the given id
 	* today - show all events today`
 	EVENTBOT_CMD_ADD                     = "add"
 	EVENTBOT_CMD_ADD_SUCCESS             = "Recorded new event."
-	EVENTBOT_CMD_LIST                    = "upcoming"
+	EVENTBOT_CMD_LIST                    = "list"
 	EVENTBOT_CMD_LIST_NONE_AVAILABLE     = "no upcoming events."
 	EVENTBOT_CMD_TODAY                   = "today"
 	EVENTBOT_CMD_TODAY_NONE_AVAILABLE    = "no events today."
@@ -55,6 +55,16 @@ func (e *Event) String() string {
 	return fmt.Sprintf("%d - %s: %s", e.Id,
 		e.Starttime.Format("Mon 2 Jan 2006, 15:04:05"),
 		e.Description)
+}
+
+type EventList []Event
+
+func (e EventList) String() string {
+	var eventstrings []string
+	for _, s := range e {
+		eventstrings = append(eventstrings, s.String())
+	}
+	return strings.Join(eventstrings, "\n")
 }
 
 /********************************** MailSender ***********************************/
@@ -86,14 +96,15 @@ func (ms *MailSender) SendPlainTextMail(msg string, toadress string) {
 	}
 }
 
-func (ms *MailSender) SendEventList(events []Event, toadress string) {
+func (ms *MailSender) SendEventList(
+	todayEvents EventList, upcomingEvents EventList, toadress string) {
 	type SmtpTemplateData struct {
-		From         string
-		To           string
-		Now          string
-		Subject      string
-		PrimaryEvent string
-		OtherEvents  string
+		From            string
+		To              string
+		Now             string
+		Subject         string
+		HighlightEvents string
+		UpcomingEvents  string
 	}
 	const emailTemplate = `From: {{.From}}
 To: {{.To}}
@@ -105,32 +116,38 @@ Hallo,
 
 kurze Erinnerung: Heute findet
 
-{{.PrimaryEvent}}
+{{.HighlightEvents}}
 
-statt. Weitere geplante Events:
+statt.
 
-{{.OtherEvents}}
+{{with .UpcomingEvents}}
+Weitere geplante Events:
+{{.}}
+{{end}}
 
-Lieben Gruß,
+Heil Eris,
 {{.From}}
 `
 	var doc bytes.Buffer
 	var err error
 	// TODO: Load Template from configuration file
-	context := &SmtpTemplateData{ms.FromAddress,
-		toadress,
-		time.Now().Format(time.RFC822),
-		"Events beim Chaos inKL.",
-		"Primärevent",
-		"Andere Events"}
+	context := &SmtpTemplateData{
+		From:            ms.FromAddress,
+		To:              toadress,
+		Now:             time.Now().Format(time.RFC822),
+		Subject:         "Reminder: Heute beim Chaos inKL.",
+		HighlightEvents: todayEvents.String(),
+		UpcomingEvents:  upcomingEvents.String(),
+	}
 	t := template.New("emailTemplate")
 	if t, err = t.Parse(emailTemplate); err != nil {
 		log.Print("error trying to parse mail template ", err)
 	}
 	if err = t.Execute(&doc, context); err != nil {
 		log.Print("error trying to execute mail template ", err)
+	} else {
+		ms.SendPlainTextMail(doc.String(), toadress)
 	}
-	ms.SendPlainTextMail(doc.String(), toadress)
 }
 
 /********************************** EventBot *************************************/
@@ -292,12 +309,17 @@ func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, e
 		EVENTBOT_PREFIX, EVENTBOT_CMD_MAILREMINDER)) {
 		answer := []string{EVENTBOT_MAILREMINDER_NOTAUTHORIZED}
 		if b.isFromOwner(msg) {
-			var events []Event
-			b.Db.Where("starttime > ?", time.Now()).Find(&events)
-			if len(events) == 0 {
+			var todayevents []Event
+			todaytime := time.Now().Truncate(24 * time.Hour)
+			tomorrow := time.Now().Add(24 * time.Hour).Truncate(24 * time.Hour)
+			b.Db.Where("starttime > ? and starttime < ?", todaytime, tomorrow).Find(&todayevents)
+			if len(todayevents) == 0 {
 				answer = []string{EVENTBOT_MAILREMINDER_NONE_AVAILABLE}
 			} else {
-				go b.MailSender.SendEventList(events, "md@gonium.net")
+				var upcomingEvents []Event
+				b.Db.Where("starttime > ?", tomorrow).Find(&upcomingEvents)
+				go b.MailSender.SendEventList(todayevents, upcomingEvents,
+					b.OwnerEmailAdress)
 				answer = []string{EVENTBOT_MAILREMINDER_REPLY}
 			}
 		}
