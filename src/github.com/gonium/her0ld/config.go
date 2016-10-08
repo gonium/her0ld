@@ -17,18 +17,19 @@ type BotConnection struct {
 }
 
 type GeneralConfig struct {
-	OwnerNick        string
-	OwnerEmailAdress string
+	OwnerNick         string
+	OwnerEmailAddress string
 }
 
 type EmailSettings struct {
-	Enabled         bool
-	SMTPUsername    string
-	SMTPPassword    string
-	SMTPServer      string
-	SMTPPort        int
-	FromAddress     string
-	RecipientAdress string
+	Enabled               bool
+	SMTPUsername          string
+	SMTPPassword          string
+	SMTPServer            string
+	SMTPPort              int
+	FromAddress           string
+	RecipientAddress      string
+	EventListMailTemplate string
 }
 
 type EventbotConfig struct {
@@ -53,8 +54,8 @@ type Config struct {
 func MkExampleConfig() Config {
 	return Config{
 		General: GeneralConfig{
-			OwnerNick:        "myowner",
-			OwnerEmailAdress: "owner@example.com",
+			OwnerNick:         "myowner",
+			OwnerEmailAddress: "owner@example.com",
 		},
 		Bots: []BotConnection{
 			{

@@ -96,72 +96,19 @@ func (ms *MailSender) SendPlainTextMail(msg string, toadress string) {
 	}
 }
 
-func (ms *MailSender) SendEventList(
-	todayEvents EventList, upcomingEvents EventList, toadress string) {
-	type SmtpTemplateData struct {
-		From            string
-		To              string
-		Now             string
-		Subject         string
-		HighlightEvents string
-		UpcomingEvents  string
-	}
-	const emailTemplate = `From: {{.From}}
-To: {{.To}}
-Subject: {{.Subject}}
-Date: {{.Now}}
-Content-Type: text/plain; charset=UTF-8
-
-Hallo,
-
-kurze Erinnerung: Heute findet
-
-{{.HighlightEvents}}
-
-statt.
-
-{{with .UpcomingEvents}}
-Weitere geplante Events:
-{{.}}
-{{end}}
-
-Heil Eris,
-{{.From}}
-`
-	var doc bytes.Buffer
-	var err error
-	// TODO: Load Template from configuration file
-	context := &SmtpTemplateData{
-		From:            ms.FromAddress,
-		To:              toadress,
-		Now:             time.Now().Format(time.RFC822),
-		Subject:         "Reminder: Heute beim Chaos inKL.",
-		HighlightEvents: todayEvents.String(),
-		UpcomingEvents:  upcomingEvents.String(),
-	}
-	t := template.New("emailTemplate")
-	if t, err = t.Parse(emailTemplate); err != nil {
-		log.Print("error trying to parse mail template ", err)
-	}
-	if err = t.Execute(&doc, context); err != nil {
-		log.Print("error trying to execute mail template ", err)
-	} else {
-		ms.SendPlainTextMail(doc.String(), toadress)
-	}
-}
-
 /********************************** EventBot *************************************/
 /* The EventBot maintains a list of events and attempts to
  * remind people. */
 type EventBot struct {
-	BotName            string
-	TimeLocation       *time.Location
-	NumMessagesHandled int
-	Db                 *gorm.DB
-	MailSender         *MailSender
-	OwnerNick          string
-	OwnerEmailAdress   string
-	RecipientAdress    string
+	BotName               string
+	TimeLocation          *time.Location
+	NumMessagesHandled    int
+	Db                    *gorm.DB
+	MailSender            *MailSender
+	OwnerNick             string
+	OwnerEmailAddress     string
+	RecipientAddress      string
+	EventListMailTemplate string
 }
 
 func NewEventBot(name string, cfg her0ld.EventbotConfig, generalcfg her0ld.GeneralConfig) *EventBot {
@@ -189,14 +136,54 @@ func NewEventBot(name string, cfg her0ld.EventbotConfig, generalcfg her0ld.Gener
 		cfg.EmailSettings.SMTPPort,
 	)
 	return &EventBot{
-		BotName:            name,
-		TimeLocation:       loc,
-		NumMessagesHandled: 0,
-		Db:                 db,
-		MailSender:         ms,
-		OwnerNick:          generalcfg.OwnerNick,
-		OwnerEmailAdress:   generalcfg.OwnerEmailAdress,
-		RecipientAdress:    cfg.EmailSettings.RecipientAdress,
+		BotName:               name,
+		TimeLocation:          loc,
+		NumMessagesHandled:    0,
+		Db:                    db,
+		MailSender:            ms,
+		OwnerNick:             generalcfg.OwnerNick,
+		OwnerEmailAddress:     generalcfg.OwnerEmailAddress,
+		RecipientAddress:      cfg.EmailSettings.RecipientAddress,
+		EventListMailTemplate: cfg.EmailSettings.EventListMailTemplate,
+	}
+}
+
+func (eb *EventBot) SendEventList(
+	todayEvents EventList, upcomingEvents EventList) {
+	type TemplateData struct {
+		From            string
+		To              string
+		Now             string
+		Subject         string
+		HighlightEvents string
+		UpcomingEvents  string
+	}
+	emailTemplate := `From: {{.From}}
+To: {{.To}}
+Subject: {{.Subject}}
+Date: {{.Now}}
+Content-Type: text/plain; charset=UTF-8
+
+` + eb.EventListMailTemplate
+	var doc bytes.Buffer
+	var err error
+	// TODO: Load Template from configuration file
+	context := &TemplateData{
+		From:            eb.MailSender.FromAddress,
+		To:              eb.RecipientAddress,
+		Now:             time.Now().Format(time.RFC822),
+		Subject:         "Reminder: Heute beim Chaos inKL.",
+		HighlightEvents: todayEvents.String(),
+		UpcomingEvents:  upcomingEvents.String(),
+	}
+	t := template.New("emailTemplate")
+	if t, err = t.Parse(emailTemplate); err != nil {
+		log.Print("error trying to parse mail template ", err)
+	}
+	if err = t.Execute(&doc, context); err != nil {
+		log.Print("error trying to execute mail template ", err)
+	} else {
+		eb.MailSender.SendPlainTextMail(doc.String(), eb.RecipientAddress)
 	}
 }
 
@@ -295,13 +282,13 @@ func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, e
 		EVENTBOT_PREFIX, EVENTBOT_CMD_MAILTEST)) {
 		answer := []string{EVENTBOT_MAILTEST_NOTAUTHORIZED}
 		if b.isFromOwner(msg) {
-			mailtext := "To: " + b.OwnerEmailAdress + "\r\n" +
+			mailtext := "To: " + b.OwnerEmailAddress + "\r\n" +
 				"From: " + b.MailSender.FromAddress + "\r\n" +
 				"Date: " + (time.Now().Format(time.RFC822)) + "\r\n" +
 				"Subject: her0ld mail test\r\n" +
 				"\r\n" +
 				"Testing mail. If you can read this everything should be working.\r\n"
-			go b.MailSender.SendPlainTextMail(mailtext, b.OwnerEmailAdress)
+			go b.MailSender.SendPlainTextMail(mailtext, b.OwnerEmailAddress)
 			answer = []string{EVENTBOT_MAILTEST_REPLY}
 		}
 		return b.strings2reply(msg.Channel, answer), nil
@@ -318,8 +305,7 @@ func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, e
 			} else {
 				var upcomingEvents []Event
 				b.Db.Where("starttime > ?", tomorrow).Find(&upcomingEvents)
-				go b.MailSender.SendEventList(todayevents, upcomingEvents,
-					b.OwnerEmailAdress)
+				go b.SendEventList(todayevents, upcomingEvents)
 				answer = []string{EVENTBOT_MAILREMINDER_REPLY}
 			}
 		}
