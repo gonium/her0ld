@@ -6,6 +6,7 @@ import (
 	"github.com/gonium/her0ld"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/robfig/cron"
 	"log"
 	"net/smtp"
 	"strconv"
@@ -41,7 +42,8 @@ const (
 	EVENTBOT_CMD_MAILREMINDER            = "mailreminder"
 	EVENTBOT_MAILREMINDER_REPLY          = "Attempted to send a reminder mail."
 	EVENTBOT_MAILREMINDER_NOTAUTHORIZED  = "Only my owner can do this."
-	EVENTBOT_MAILREMINDER_NONE_AVAILABLE = "No upcoming events found, not sending."
+	EVENTBOT_MAILREMINDER_SEND_ERROR     = "Failed to send reminder email, check log."
+	EVENTBOT_MAILREMINDER_NONE_AVAILABLE = "No events for today found, not sending."
 )
 
 /********************************** Event *************************************/
@@ -109,6 +111,7 @@ type EventBot struct {
 	OwnerEmailAddress     string
 	RecipientAddress      string
 	EventListMailTemplate string
+	Cron                  *cron.Cron
 }
 
 func NewEventBot(name string, cfg her0ld.EventbotConfig, generalcfg her0ld.GeneralConfig) *EventBot {
@@ -135,7 +138,7 @@ func NewEventBot(name string, cfg her0ld.EventbotConfig, generalcfg her0ld.Gener
 		cfg.EmailSettings.SMTPServer,
 		cfg.EmailSettings.SMTPPort,
 	)
-	return &EventBot{
+	retval := &EventBot{
 		BotName:               name,
 		TimeLocation:          loc,
 		NumMessagesHandled:    0,
@@ -145,46 +148,83 @@ func NewEventBot(name string, cfg her0ld.EventbotConfig, generalcfg her0ld.Gener
 		OwnerEmailAddress:     generalcfg.OwnerEmailAddress,
 		RecipientAddress:      cfg.EmailSettings.RecipientAddress,
 		EventListMailTemplate: cfg.EmailSettings.EventListMailTemplate,
+		Cron: cron.New(),
 	}
+	retval.Cron.AddFunc("0 0 1 * * *", func() {
+		log.Println("Cron: Triggering event list email.")
+		switch retval.SendEventList() {
+		case NO_EVENT_TODAY:
+			log.Printf("Cron: %s", EVENTBOT_MAILREMINDER_NONE_AVAILABLE)
+		case SEND_ERROR:
+			log.Printf("Cron: %s", EVENTBOT_MAILREMINDER_SEND_ERROR)
+		case SEND_SUCCESS:
+			log.Printf("Cron: %s", EVENTBOT_MAILREMINDER_REPLY)
+		default:
+			log.Println("Cron: Unknown return code from SendEventList - WTF?")
+		}
+	})
+	retval.Cron.Start()
+	return retval
 }
 
-func (eb *EventBot) SendEventList(
-	todayEvents EventList, upcomingEvents EventList) {
-	type TemplateData struct {
-		From            string
-		To              string
-		Now             string
-		Subject         string
-		HighlightEvents string
-		UpcomingEvents  string
-	}
-	emailTemplate := `From: {{.From}}
+type SendEventListStatus int
+
+const (
+	NO_EVENT_TODAY = iota
+	SEND_SUCCESS   = iota
+	SEND_ERROR     = iota
+)
+
+func (eb *EventBot) SendEventList() (status SendEventListStatus) {
+	var todayEvents EventList
+	todaytime := time.Now().Truncate(24 * time.Hour)
+	tomorrow := time.Now().Add(24 * time.Hour).Truncate(24 * time.Hour)
+	eb.Db.Where("starttime > ? and starttime < ?", todaytime, tomorrow).Find(&todayEvents)
+	if len(todayEvents) == 0 {
+		status = NO_EVENT_TODAY
+	} else {
+		var upcomingEvents EventList
+		eb.Db.Where("starttime > ?", tomorrow).Find(&upcomingEvents)
+		type TemplateData struct {
+			From            string
+			To              string
+			Now             string
+			Subject         string
+			HighlightEvents string
+			UpcomingEvents  string
+		}
+		emailTemplate := `From: {{.From}}
 To: {{.To}}
 Subject: {{.Subject}}
 Date: {{.Now}}
 Content-Type: text/plain; charset=UTF-8
 
 ` + eb.EventListMailTemplate
-	var doc bytes.Buffer
-	var err error
-	// TODO: Load Template from configuration file
-	context := &TemplateData{
-		From:            eb.MailSender.FromAddress,
-		To:              eb.RecipientAddress,
-		Now:             time.Now().Format(time.RFC822),
-		Subject:         "Reminder: Heute beim Chaos inKL.",
-		HighlightEvents: todayEvents.String(),
-		UpcomingEvents:  upcomingEvents.String(),
+		var doc bytes.Buffer
+		var err error
+		// TODO: Load Template from configuration file
+		context := &TemplateData{
+			From:            eb.MailSender.FromAddress,
+			To:              eb.RecipientAddress,
+			Now:             time.Now().Format(time.RFC822),
+			Subject:         "Reminder: Heute beim Chaos inKL.",
+			HighlightEvents: todayEvents.String(),
+			UpcomingEvents:  upcomingEvents.String(),
+		}
+		t := template.New("emailTemplate")
+		if t, err = t.Parse(emailTemplate); err != nil {
+			log.Print("error trying to parse mail template ", err)
+			status = SEND_ERROR
+		}
+		if err = t.Execute(&doc, context); err != nil {
+			log.Print("error trying to execute mail template ", err)
+			status = SEND_ERROR
+		} else {
+			eb.MailSender.SendPlainTextMail(doc.String(), eb.RecipientAddress)
+			status = SEND_SUCCESS
+		}
 	}
-	t := template.New("emailTemplate")
-	if t, err = t.Parse(emailTemplate); err != nil {
-		log.Print("error trying to parse mail template ", err)
-	}
-	if err = t.Execute(&doc, context); err != nil {
-		log.Print("error trying to execute mail template ", err)
-	} else {
-		eb.MailSender.SendPlainTextMail(doc.String(), eb.RecipientAddress)
-	}
+	return status
 }
 
 func (b *EventBot) isFromOwner(msg InboundMessage) bool {
@@ -296,17 +336,15 @@ func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, e
 		EVENTBOT_PREFIX, EVENTBOT_CMD_MAILREMINDER)) {
 		answer := []string{EVENTBOT_MAILREMINDER_NOTAUTHORIZED}
 		if b.isFromOwner(msg) {
-			var todayevents []Event
-			todaytime := time.Now().Truncate(24 * time.Hour)
-			tomorrow := time.Now().Add(24 * time.Hour).Truncate(24 * time.Hour)
-			b.Db.Where("starttime > ? and starttime < ?", todaytime, tomorrow).Find(&todayevents)
-			if len(todayevents) == 0 {
+			switch b.SendEventList() {
+			case NO_EVENT_TODAY:
 				answer = []string{EVENTBOT_MAILREMINDER_NONE_AVAILABLE}
-			} else {
-				var upcomingEvents []Event
-				b.Db.Where("starttime > ?", tomorrow).Find(&upcomingEvents)
-				go b.SendEventList(todayevents, upcomingEvents)
+			case SEND_ERROR:
+				answer = []string{EVENTBOT_MAILREMINDER_SEND_ERROR}
+			case SEND_SUCCESS:
 				answer = []string{EVENTBOT_MAILREMINDER_REPLY}
+			default:
+				log.Println("Unknown return code from SendEventList - WTF?")
 			}
 		}
 		return b.strings2reply(msg.Channel, answer), nil

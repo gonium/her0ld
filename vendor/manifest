@@ -71,6 +71,12 @@
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/robfig/cron",
+			"repository": "https://github.com/robfig/cron",
+			"revision": "9585fd555638e77bba25f25db5c44b41f264aeb7",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/thoj/go-ircevent",
 			"repository": "https://github.com/thoj/go-ircevent",
 			"revision": "da78ed515c0f0833e7a92c7cc52898176198e2c1",
