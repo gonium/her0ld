@@ -9,6 +9,7 @@ import (
 	"github.com/robfig/cron"
 	"log"
 	"net/smtp"
+	"sort"
 	"strconv"
 	"strings"
 	"text/template"
@@ -53,8 +54,8 @@ type Event struct {
 }
 
 func (e *Event) String() string {
-	return fmt.Sprintf("%d - %s: %s", e.Id,
-		e.Starttime.Format("Mon 2 Jan 2006, 15:04:05"),
+	return fmt.Sprintf("(%d) %s - %s", e.Id,
+		e.Starttime.Format("Mon 2 Jan 2006, 15:04"),
 		e.Description)
 }
 
@@ -66,6 +67,20 @@ func (e EventList) String() string {
 		eventstrings = append(eventstrings, s.String())
 	}
 	return strings.Join(eventstrings, "\n")
+}
+
+// Implementation of the sort.Interface for EventList, see
+// https://gobyexample.com/sorting-by-functions
+type ByDate EventList
+
+func (el ByDate) Len() int {
+	return len(el)
+}
+func (el ByDate) Swap(i, j int) {
+	el[i], el[j] = el[j], el[i]
+}
+func (el ByDate) Less(i, j int) bool {
+	return el[i].Starttime.Before(el[j].Starttime)
 }
 
 /********************************** MailSender ***********************************/
@@ -184,6 +199,7 @@ func (eb *EventBot) SendEventList() (status SendEventListStatus) {
 	} else {
 		var upcomingEvents EventList
 		eb.Db.Where("starttime > ?", tomorrow).Find(&upcomingEvents)
+		sort.Sort(ByDate(upcomingEvents))
 		type TemplateData struct {
 			From            string
 			To              string
@@ -270,6 +286,7 @@ func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, e
 		if len(events) == 0 {
 			answer = append(answer, EVENTBOT_CMD_LIST_NONE_AVAILABLE)
 		} else {
+			sort.Sort(ByDate(events))
 			for _, event := range events {
 				answer = append(answer, event.String())
 			}
