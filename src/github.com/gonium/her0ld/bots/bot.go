@@ -31,4 +31,16 @@ type Bot interface {
 	ProcessChannelEvent(incoming InboundMessage) ([]OutboundMessage, error)
 	ProcessQueryEvent(incoming InboundMessage) ([]OutboundMessage, error)
 	GetName() string
+	GetHelpLines() []string
+}
+
+func strings2reply(dest string, lines []string) []OutboundMessage {
+	reply := make([]OutboundMessage, len(lines))
+	for idx, line := range lines {
+		reply[idx] = OutboundMessage{
+			Destination: dest,
+			Message:     line,
+		}
+	}
+	return reply
 }

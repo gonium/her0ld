@@ -112,10 +112,12 @@ func main() {
 					allBots = append(allBots, her0ldbot.NewPingBot("Pingbot"))
 				}
 				if cfg.Functions.Eventbot_enable {
-					// TODO: Move settings to the configuration file
 					allBots = append(allBots, her0ldbot.NewEventBot("Eventbot",
 						cfg.EventbotCfg, cfg.General))
 				}
+				// Always add the help bot - handles !help.
+				allBots = append(allBots, her0ldbot.NewHelpBot("Helpbot",
+					allBots))
 
 				// Join channel upon welcome message
 				ircconn.AddCallback("001", func(e *irc.Event) {
@@ -132,9 +134,9 @@ func main() {
 					//event.Message() contains the message
 					//event.Nick Contains the sender
 					//event.Arguments[0] Contains the channel
-					for idx, arg := range event.Arguments {
-						log.Println("%d - %s", idx, arg)
-					}
+					//for idx, arg := range event.Arguments {
+					//	log.Println("%d - %s", idx, arg)
+					//}
 					source := event.Arguments[0]
 					msg := her0ldbot.InboundMessage{
 						Channel: source,
@@ -143,7 +145,9 @@ func main() {
 					}
 					if msg.IsChannelEvent() {
 						// channel message
-						log.Printf("Inbound channel message: %s", msg)
+						if c.Bool("verbose") {
+							log.Printf("Inbound channel message: %s", msg)
+						}
 						for _, bot := range allBots {
 							answerlines, err := bot.ProcessChannelEvent(msg)
 							if err != nil {
@@ -165,7 +169,9 @@ func main() {
 						// query message
 						// TODO: This is broken. event.Nick does not contain the sender,
 						// but the bot itself.
-						log.Printf("Inbound query message: %s", msg)
+						if c.Bool("verbose") {
+							log.Printf("Inbound query message: %s", msg)
+						}
 						for _, bot := range allBots {
 							answerlines, err := bot.ProcessQueryEvent(msg)
 							if err != nil {

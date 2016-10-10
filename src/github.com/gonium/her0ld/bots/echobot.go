@@ -34,3 +34,8 @@ func (b *EchoBot) ProcessQueryEvent(msg InboundMessage) ([]OutboundMessage, erro
 func (b *EchoBot) GetName() string {
 	return b.BotName
 }
+
+func (b *EchoBot) GetHelpLines() []string {
+	return []string{"Echoes everything you send to this bot.",
+		"Intended for debugging during development."}
+}

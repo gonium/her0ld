@@ -35,3 +35,7 @@ func (b *PingBot) ProcessQueryEvent(msg InboundMessage) ([]OutboundMessage, erro
 func (b *PingBot) GetName() string {
 	return b.BotName
 }
+
+func (b *PingBot) GetHelpLines() []string {
+	return []string{"You say !ping, I say PONG."}
+}

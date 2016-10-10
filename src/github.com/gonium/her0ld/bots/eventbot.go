@@ -21,12 +21,11 @@ const (
 	EVENTBOT_INVALID_COMMAND     = "invalid command - see !event help."
 	EVENTBOT_PREFIX              = "!event"
 	EVENTBOT_CMD_HELP            = "help"
-	EVENTBOT_HELP_TEXT           = `!event usage:
-	* help - this text
-	* add <date> <description> - add an event
-	* list - list all upcoming events (with id)
-	* del <id> - remove the event with the given id
-	* today - show all events today`
+	EVENTBOT_HELP_TEXT           = `* !event help - this text
+* !event add <date> <description> - add an event
+* !event list - list all upcoming events (with id)
+* !event del <id> - remove the event with the given id
+* !event today - show all events today`
 	EVENTBOT_CMD_ADD                     = "add"
 	EVENTBOT_CMD_ADD_SUCCESS             = "Recorded new event."
 	EVENTBOT_CMD_LIST                    = "list"
@@ -231,17 +230,6 @@ func (b *EventBot) isFromOwner(msg InboundMessage) bool {
 	return msg.Nick == b.OwnerNick
 }
 
-func (b *EventBot) strings2reply(dest string, lines []string) []OutboundMessage {
-	reply := make([]OutboundMessage, len(lines))
-	for idx, line := range lines {
-		reply[idx] = OutboundMessage{
-			Destination: dest,
-			Message:     line,
-		}
-	}
-	return reply
-}
-
 func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, error) {
 	b.NumMessagesHandled += 1
 	// look for commands
@@ -250,7 +238,7 @@ func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, e
 		EVENTBOT_PREFIX, EVENTBOT_CMD_HELP)) {
 		// help command
 		answer := strings.Split(EVENTBOT_HELP_TEXT, "\n")
-		return b.strings2reply(msg.Channel, answer), nil
+		return strings2reply(msg.Channel, answer), nil
 	} else if strings.HasPrefix(msg.Message, fmt.Sprintf("%s %s",
 		EVENTBOT_PREFIX, EVENTBOT_CMD_ADD)) {
 		// add new event command
@@ -263,7 +251,7 @@ func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, e
 				EVENTBOT_INVALID_TIME_FORMAT,
 				fmt.Sprintf("Error was: %s", err.Error()),
 			}
-			return b.strings2reply(msg.Channel, answer), nil
+			return strings2reply(msg.Channel, answer), nil
 		} else {
 			description := strings.Join(request[3:], " ")
 			newEvent := Event{
@@ -272,7 +260,7 @@ func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, e
 			}
 			b.Db.Create(&newEvent)
 			answer := []string{EVENTBOT_CMD_ADD_SUCCESS}
-			return b.strings2reply(msg.Channel, answer), nil
+			return strings2reply(msg.Channel, answer), nil
 		}
 	} else if strings.HasPrefix(msg.Message, fmt.Sprintf("%s %s",
 		EVENTBOT_PREFIX, EVENTBOT_CMD_LIST)) {
@@ -286,7 +274,7 @@ func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, e
 				answer = append(answer, event.String())
 			}
 		}
-		return b.strings2reply(msg.Channel, answer), nil
+		return strings2reply(msg.Channel, answer), nil
 	} else if strings.HasPrefix(msg.Message, fmt.Sprintf("%s %s",
 		EVENTBOT_PREFIX, EVENTBOT_CMD_TODAY)) {
 		var answer []string
@@ -301,7 +289,7 @@ func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, e
 				answer = append(answer, event.String())
 			}
 		}
-		return b.strings2reply(msg.Channel, answer), nil
+		return strings2reply(msg.Channel, answer), nil
 	} else if strings.HasPrefix(msg.Message, fmt.Sprintf("%s %s",
 		EVENTBOT_PREFIX, EVENTBOT_CMD_DELETE)) {
 		request := strings.Split(msg.Message, " ")
@@ -317,7 +305,7 @@ func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, e
 					event.Id))
 			}
 		}
-		return b.strings2reply(msg.Channel, answer), nil
+		return strings2reply(msg.Channel, answer), nil
 	} else if strings.HasPrefix(msg.Message, fmt.Sprintf("%s %s",
 		EVENTBOT_PREFIX, EVENTBOT_CMD_MAILTEST)) {
 		answer := []string{EVENTBOT_MAILTEST_NOTAUTHORIZED}
@@ -331,7 +319,7 @@ func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, e
 			go b.MailSender.SendPlainTextMail(mailtext, b.OwnerEmailAddress)
 			answer = []string{EVENTBOT_MAILTEST_REPLY}
 		}
-		return b.strings2reply(msg.Channel, answer), nil
+		return strings2reply(msg.Channel, answer), nil
 	} else if strings.HasPrefix(msg.Message, fmt.Sprintf("%s %s",
 		EVENTBOT_PREFIX, EVENTBOT_CMD_MAILREMINDER)) {
 		answer := []string{EVENTBOT_MAILREMINDER_NOTAUTHORIZED}
@@ -347,11 +335,11 @@ func (b *EventBot) ProcessChannelEvent(msg InboundMessage) ([]OutboundMessage, e
 				log.Println("Unknown return code from SendEventList - WTF?")
 			}
 		}
-		return b.strings2reply(msg.Channel, answer), nil
+		return strings2reply(msg.Channel, answer), nil
 	} else if strings.HasPrefix(msg.Message, EVENTBOT_PREFIX) {
 		// invalid command (!event foo)
 		answer := []string{EVENTBOT_INVALID_COMMAND}
-		return b.strings2reply(msg.Channel, answer), nil
+		return strings2reply(msg.Channel, answer), nil
 	} else { // something else
 		return nil, nil
 	}
@@ -368,8 +356,6 @@ func (b *EventBot) GetName() string {
 	return b.BotName
 }
 
-// TODO:
-// - Generate Email templates and process them.
-// (https://gist.github.com/nathanleclaire/8662755)
-// - Send reminder emails based on cron
-// (https://godoc.org/github.com/robfig/cron).
+func (b *EventBot) GetHelpLines() []string {
+	return strings.Split(EVENTBOT_HELP_TEXT, "\n")
+}
