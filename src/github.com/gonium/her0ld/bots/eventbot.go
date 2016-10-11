@@ -7,7 +7,9 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/robfig/cron"
+	"io"
 	"log"
+	"net/http"
 	"net/smtp"
 	"sort"
 	"strconv"
@@ -126,6 +128,7 @@ type EventBot struct {
 	RecipientAddress      string
 	EventListMailTemplate string
 	Cron                  *cron.Cron
+	HttpListenAddress     string
 }
 
 func NewEventBot(name string, cfg her0ld.EventbotConfig, generalcfg her0ld.GeneralConfig) *EventBot {
@@ -162,7 +165,8 @@ func NewEventBot(name string, cfg her0ld.EventbotConfig, generalcfg her0ld.Gener
 		OwnerEmailAddress:     generalcfg.OwnerEmailAddress,
 		RecipientAddress:      cfg.EmailSettings.RecipientAddress,
 		EventListMailTemplate: cfg.EmailSettings.EventListMailTemplate,
-		Cron: cron.New(),
+		Cron:              cron.New(),
+		HttpListenAddress: cfg.HttpSettings.ListenAddress,
 	}
 	retval.Cron.AddFunc("0 0 1 * * *", func() {
 		log.Println("Cron: Triggering event list email.")
@@ -178,7 +182,18 @@ func NewEventBot(name string, cfg her0ld.EventbotConfig, generalcfg her0ld.Gener
 		}
 	})
 	retval.Cron.Start()
+	go retval.ServeHTTP()
 	return retval
+}
+
+func (b *EventBot) ServeHTTP() {
+	// TODO: Generate template fu like this: http://stackoverflow.com/a/11468132
+	// or this: https://github.com/valyala/quicktemplate
+	hello := func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "Hello World!")
+	}
+	http.HandleFunc("/", hello)
+	http.ListenAndServe(b.HttpListenAddress, nil)
 }
 
 type SendEventListStatus int

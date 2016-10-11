@@ -32,10 +32,15 @@ type EmailSettings struct {
 	EventListMailTemplate string
 }
 
+type HttpSettings struct {
+	ListenAddress string
+}
+
 type EventbotConfig struct {
 	Timezone      string
 	DBFile        string
 	EmailSettings EmailSettings
+	HttpSettings  HttpSettings
 }
 
 type BotEnable struct {
