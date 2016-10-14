@@ -187,10 +187,48 @@ func NewEventBot(name string, cfg her0ld.EventbotConfig, generalcfg her0ld.Gener
 }
 
 func (b *EventBot) ServeHTTP() {
+	const header = `{{define "HEADER"}}
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>her0ld</title>
+	</head>
+	<body>
+	{{end}}
+	`
+	const footer = `{{define "FOOTER"}}
+	</body>
+</html>
+	{{end}}
+`
+	const index = `
+	{{template "HEADER"}}
+	<p>indexfoo</p>
+	{{template "FOOTER"}}
+	`
+	check := func(err error) {
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	t := template.New("Webpage")
+	t, err := t.Parse(header)
+	check(err)
+	t, err = t.Parse(footer)
+	check(err)
+	t, err = t.Parse(index)
+	check(err)
+
 	// TODO: Generate template fu like this: http://stackoverflow.com/a/11468132
 	// or this: https://github.com/valyala/quicktemplate
 	hello := func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, "Hello World!")
+		err = t.Execute(w, nil)
+		if err != nil {
+			io.WriteString(w, fmt.Sprintf("Failed to render page: %s",
+				err.Error()))
+			//io.WriteString(w, "Hello World!")
+		}
 	}
 	http.HandleFunc("/", hello)
 	http.ListenAndServe(b.HttpListenAddress, nil)
@@ -204,6 +242,8 @@ const (
 	SEND_ERROR     = iota
 )
 
+// TODO: Refactor - should send return value via channel and live in
+// a goroutine...
 func (eb *EventBot) SendEventList() (status SendEventListStatus) {
 	var todayEvents EventList
 	todaytime := time.Now().Truncate(24 * time.Hour)
